@@ -22,12 +22,10 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      # 以下 optional（AI 分類）
+      # OPENAI 係 optional，有預設值；唔想用 AI 分類可以唔填 KEY
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_BASE_URL
         value: https://api.openai.com/v1
-        sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
-        sync: false
