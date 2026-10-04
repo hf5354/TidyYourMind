@@ -1,0 +1,33 @@
+# Render 一鍵部署設定（放喺 repo root；程式碼喺 web/ 目錄）
+# 用法：將 repo 連去 Render，佢會自動讀呢個檔。記得喺 Render dashboard 設定下面嘅環境變數。
+services:
+  - type: web
+    name: tidymind-web
+    runtime: node
+    plan: free
+    buildCommand: npm install --prefix web/backend
+    startCommand: npm start --prefix web/backend
+    healthCheckPath: /auth/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # 以下必填，請喺 Render Dashboard → Environment 填入（唔好寫喺呢個檔）
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      # 以下 optional（AI 分類）
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://api.openai.com/v1
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+        sync: false

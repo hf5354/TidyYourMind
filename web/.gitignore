@@ -1,0 +1,4 @@
+# 唔好將真正嘅 .env／credentials 上傳
+.env
+node_modules/
+*.log

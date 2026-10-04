@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>TidyYourMind — 收藏整理</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🧠 TidyYourMind</div>
+    <div class="topbar-right">
+      <span id="conn-status" class="pill">檢查緊連接…</span>
+      <button id="btn-login" class="btn primary hidden">登入 Google Drive</button>
+      <button id="btn-drive-folder" class="btn hidden">📁 開啟 Drive 資料夾</button>
+      <button id="btn-logout" class="btn ghost hidden">登出</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <nav id="views">
+        <button class="view-btn active" data-view="all">📚 全部內容</button>
+        <button class="view-btn" data-view="uncat">🗂️ 未分類</button>
+        <button class="view-btn" data-view="trash">🗑️ 垃圾桶</button>
+      </nav>
+      <div class="side-head">
+        <span>分類</span>
+        <button id="btn-add-cat" class="btn small">＋ 新增</button>
+      </div>
+      <ul id="cat-list" class="cat-list"></ul>
+    </aside>
+
+    <main class="content">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="即時搜尋標題、簡介…" autocomplete="off" />
+        <button id="btn-add-item" class="btn primary">＋ 加入內容</button>
+        <button id="btn-ai" class="btn ai">✨ AI 協助分類</button>
+      </div>
+      <div id="ai-note" class="ai-note hidden"></div>
+      <div id="items" class="items"></div>
+      <div id="empty" class="empty hidden">暫時未有內容，撳「加入內容」開始收藏啦。</div>
+    </main>
+  </div>
+
+  <!-- 加入／編輯內容 -->
+  <div id="modal-item" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="item-modal-title">加入內容</h2>
+      <label>標題<input id="f-title" maxlength="200" placeholder="例如：香港天文台天氣報告" /></label>
+      <label>連結<input id="f-url" inputmode="url" placeholder="https://…" /></label>
+      <label>類型
+        <select id="f-type">
+          <option>網站</option><option>新聞</option><option>影片</option><option>文件</option>
+        </select>
+      </label>
+      <label>簡介（AI 會幫你寫，你都可以自己改）<textarea id="f-summary" rows="3" maxlength="2000"></textarea></label>
+      <div class="field">分類（可多選）
+        <div id="f-cats" class="check-list"></div>
+        <div class="new-cat-row">
+          <input id="f-newcat" maxlength="60" placeholder="或即場新增分類名…" />
+          <button id="f-addcat" class="btn small" type="button">加入</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="f-cancel" class="btn ghost">取消</button>
+        <button id="f-save" class="btn primary">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分類新增／改名 -->
+  <div id="modal-cat" class="modal hidden">
+    <div class="modal-card small">
+      <h2 id="cat-modal-title">新增分類</h2>
+      <label>分類名稱<input id="c-name" maxlength="60" /></label>
+      <div class="modal-actions">
+        <button id="c-cancel" class="btn ghost">取消</button>
+        <button id="c-save" class="btn primary">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 協助分類 -->
+  <div id="modal-ai" class="modal hidden">
+    <div class="modal-card">
+      <h2>✨ AI 協助分類</h2>
+      <p id="ai-provider-note" class="muted"></p>
+      <div class="ai-scope">
+        <label><input type="radio" name="ai-scope" value="uncategorized" checked /> 只處理未分類項目</label>
+        <label><input type="radio" name="ai-scope" value="all" /> 重新分類全部項目</label>
+      </div>
+      <div class="modal-actions">
+        <button id="ai-cancel" class="btn ghost">取消</button>
+        <button id="ai-run" class="btn ai">開始建議</button>
+      </div>
+      <div id="ai-results"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
