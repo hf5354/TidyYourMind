@@ -104,7 +104,7 @@ body {
   background: var(--card); border: 1px solid var(--border); border-radius: 14px;
   padding: 16px; display: flex; flex-direction: column; gap: 8px;
 }
-.card h3 { margin: 0; font-size: 1.05em; }
+.card h3 { margin: 0; font-size: 1.05em; overflow-wrap: anywhere; }
 .card h3 a { color: var(--text); text-decoration: none; }
 .card h3 a:hover { color: var(--primary); text-decoration: underline; }
 .type-badge {
@@ -112,8 +112,11 @@ body {
   background: var(--bg); border: 1px solid var(--border); color: var(--muted);
   width: fit-content;
 }
-.summary { font-size: 0.9em; color: var(--muted); line-height: 1.6;
+.summary { font-size: 0.9em; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.topbar-left { display: flex; align-items: center; gap: 8px; }
+.menu-btn { display: none; }
+.field .fit { align-self: flex-start; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 0.78em; padding: 3px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
 .chip.none { color: var(--muted); font-style: italic; }
@@ -160,7 +163,50 @@ body {
   z-index: 100; font-size: 0.95em; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
+/* ---------- 手機版 ---------- */
 @media (max-width: 760px) {
+  html, body { overflow-x: hidden; }
+
+  .topbar { padding: 8px 12px; gap: 8px; }
+  .brand { font-size: 1.05em; }
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
+  .topbar-right { gap: 6px; }
+  .topbar-right .btn { min-height: 44px; }
+  .pill { font-size: 0.78em; overflow-wrap: anywhere; }
+
   .layout { flex-direction: column; }
-  .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  .sidebar { display: none; width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  .sidebar.open { display: block; }
+  .view-btn { min-height: 44px; }
+  .cat-list li { min-height: 44px; }
+  .icon-btn { min-width: 44px; min-height: 44px; font-size: 1em; }
+
+  .content { padding: 12px; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar input[type="search"] { min-width: 0; width: 100%; }
+  .toolbar .btn { width: 100%; min-height: 44px; }
+
+  .items { grid-template-columns: 1fr; }
+  .card { padding: 14px; }
+  .card h3 a { overflow-wrap: anywhere; }
+  .card-actions { flex-wrap: wrap; }
+  .card-actions .btn { min-height: 44px; }
+
+  .modal { padding: 0; align-items: flex-end; }
+  .modal-card {
+    width: 100%; max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: 92vh; max-height: 92dvh;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .btn { min-height: 44px; flex: 1; }
+  .check-list label { min-height: 44px; }
+  .new-cat-row { flex-direction: column; }
+  .new-cat-row .btn { min-height: 44px; }
+
+  .toast {
+    max-width: calc(100vw - 32px); text-align: center;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+  }
 }

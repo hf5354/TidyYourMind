@@ -378,4 +378,22 @@ router.post('/ai/apply', async (req, res) => {
   }
 });
 
+/* ---------- AI 生成簡介 ---------- */
+
+router.post('/ai/summarize', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const title = typeof body.title === 'string' ? body.title.trim().slice(0, MAX_TITLE) : '';
+    const url = body.url ? cleanUrl(body.url) : null;
+    if (body.url && !url) return bad(res, 400, '連結格式唔正確，只接受 http(s) 連結');
+    if (!title && !url) return bad(res, 400, '請至少提供標題或連結');
+    const type = ITEM_TYPES.includes(body.type) ? body.type : '網站';
+    const result = await ai.generateSummary({ title, url, type });
+    res.json({ ok: true, summary: result.summary, provider: result.provider, note: result.note || '' });
+  } catch (err) {
+    console.error('[api] AI 簡介失敗：', err.message);
+    bad(res, 502, '生成簡介失敗，請稍後再試或人手填寫');
+  }
+});
+
 module.exports = router;

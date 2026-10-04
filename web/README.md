@@ -10,6 +10,7 @@
 - 收藏內容：新增、編輯、刪除（先入垃圾桶，可還原；亦可永久刪除）
 - 每件收藏可屬**多個**分類；加入時可多選現有分類或即場新增分類名
 - ✨ 一鍵 AI 協助分類：為未分類／全部項目建議分類，列出修改記錄（由咩分類變咩分類＋原因），你確認後先套用
+- 🤖 AI 生成簡介：新增／編輯項目時一鍵由 AI 用繁體中文寫 2–3 句簡介（server 會先抓取目標網頁嘅標題／描述做參考）；冇金鑰時用規則式後備並註明
 - 即時搜尋（標題＋簡介）
 - 冇 AI 金鑰時自動用內置規則式分類，並喺 UI 誠實標示
 
@@ -100,11 +101,17 @@ docker build -t tidymind-web .
 docker run -p 3000:3000 --env-file .env tidymind-web
 ```
 
-## AI 分類說明
+## AI 功能說明
 
+### AI 協助分類
 - 有 `OPENAI_API_KEY`：經 OpenAI-compatible chat completions API 建議分類（淨係傳分類名單同項目標題／連結／簡介，不傳 Drive token）。
 - 冇 key：用關鍵字 heuristic（例如見到 youtube 就建議「影片」），UI 會註明係規則式分類。
 - AI 失敗（例如 API 錯誤）會自動跌返去 heuristic，唔會成個功能死咗。
+
+### AI 生成簡介（新增／編輯項目 modal 入面個「🤖 AI 生成簡介」掣）
+- 有 `OPENAI_API_KEY`：server 會先抓取目標連結嘅 HTML（只限 http/https、8 秒 timeout、最多 ~500KB、最多 3 個 redirect、抽 `<title>` 同 description／og:description；內網地址會被 SSRF 保護擋走，任何失敗都唔會 crash），再叫 AI 用繁體中文寫 2–3 句簡介（≤150 字）。
+- 冇 key 或 AI 失敗：用規則式後備（標題＋類型＋網域砌一句），並誠實註明係規則式，唔會扮係 AI 寫。
+- 生成結果填入簡介欄，你照樣可以人手改；失敗唔會影響其他功能。
 - 絕對唔會喺 code 入面寫死任何 key；全部經環境變數。
 
 ## 安全
@@ -120,6 +127,6 @@ docker run -p 3000:3000 --env-file .env tidymind-web
 1. 用戶得一個 Google 帳號（用預設帳號登入，未做多帳號切換）。
 2. Session 用 memory store：demo／單人自用夠，但重啟會登出、唔適合多 instance；production 請轉 `connect-redis` 等。
 3. `data.json` 快取 20 秒：同一用戶短時間內喺兩部機改嘢，最後寫入會覆蓋（last-write-wins），未做衝突合併。
-4. AI 簡介係「加入時由用戶／AI 填寫」而唔係自動爬蟲：自動抓取網頁內容需要額外爬蟲服務，超出 MVP 範圍；`summary` 欄位已預留，之後可加。
+4. AI 生成簡介會 server-side 抓取目標網頁嘅 `<title>`／meta description 做參考（8 秒 timeout、~500KB 上限、擋內網 SSRF），唔會下載成個網頁內容；只傳標題／描述畀 AI，唔傳 Drive token。
 5. 未做 App Store／iOS Share Extension 對接：iOS App 可直接讀寫同一個 Drive `data.json` 做到同步。
 6. Google OAuth consent screen 未發佈前，每 7 日要重新授權（Google 對 testing mode 嘅限制）；正式用請做 Google 驗證。

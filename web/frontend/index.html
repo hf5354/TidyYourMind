@@ -2,14 +2,17 @@
 <html lang="zh-HK">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <title>TidyYourMind — 收藏整理</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">🧠 TidyYourMind</div>
+    <div class="topbar-left">
+      <button id="btn-menu" class="btn small menu-btn" aria-label="開關分類選單">☰</button>
+      <div class="brand">🧠 TidyYourMind</div>
+    </div>
     <div class="topbar-right">
       <span id="conn-status" class="pill">檢查緊連接…</span>
       <button id="btn-login" class="btn primary hidden">登入 Google Drive</button>
@@ -55,7 +58,10 @@
           <option>網站</option><option>新聞</option><option>影片</option><option>文件</option>
         </select>
       </label>
-      <label>簡介（AI 會幫你寫，你都可以自己改）<textarea id="f-summary" rows="3" maxlength="2000"></textarea></label>
+      <div class="field">簡介
+        <button id="f-aisummary" class="btn small ai fit" type="button">🤖 AI 生成簡介</button>
+        <textarea id="f-summary" rows="3" maxlength="2000" placeholder="AI 會幫你寫，你都可以自己改"></textarea>
+      </div>
       <div class="field">分類（可多選）
         <div id="f-cats" class="check-list"></div>
         <div class="new-cat-row">

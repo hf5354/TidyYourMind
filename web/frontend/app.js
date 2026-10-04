@@ -151,6 +151,7 @@ function renderCats() {
       state.activeCat = id;
       syncViewButtons();
       renderAll();
+      closeSidebar();
     });
   });
 }
@@ -213,6 +214,12 @@ function syncViewButtons() {
   if (state.view === 'trash') loadTrash();
 }
 
+/** 手機版揀完分類／視圖後收起 sidebar（desktop 冇影響）。 */
+function closeSidebar() {
+  const sb = document.querySelector('.sidebar');
+  if (sb) sb.classList.remove('open');
+}
+
 /* ---------- 分類 CRUD ---------- */
 
 function openCatModal(id) {
@@ -253,6 +260,7 @@ function openItemModal(item) {
   $('f-type').value = item ? item.type : '網站';
   $('f-summary').value = item ? (item.summary || '') : '';
   $('f-newcat').value = '';
+  resetAiSummaryBtn();
   renderItemCatChecks(item ? (item.categories || []) : []);
   $('modal-item').classList.remove('hidden');
   $('f-title').focus();
@@ -294,6 +302,38 @@ async function saveItem() {
     $('modal-item').classList.add('hidden');
     await loadData();
   } catch (err) { toast(err.message); }
+}
+
+/* ---------- AI 生成簡介 ---------- */
+
+function resetAiSummaryBtn() {
+  const btn = $('f-aisummary');
+  btn.disabled = false;
+  btn.textContent = '🤖 AI 生成簡介';
+}
+
+async function genSummary() {
+  const btn = $('f-aisummary');
+  btn.disabled = true;
+  btn.textContent = '生成中…';
+  try {
+    const data = await api('/api/ai/summarize', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: $('f-title').value.trim(),
+        url: $('f-url').value.trim(),
+        type: $('f-type').value,
+      }),
+    });
+    $('f-summary').value = data.summary || '';
+    toast(data.provider === 'openai'
+      ? 'AI 簡介已生成'
+      : `已生成簡介（${data.note || '規則式'}）`);
+  } catch (err) {
+    toast('生成失敗：' + err.message);
+  } finally {
+    resetAiSummaryBtn();
+  }
 }
 
 /* ---------- AI 協助分類 ---------- */
@@ -380,9 +420,13 @@ function bind() {
       syncViewButtons();
       renderAll();
       if (state.view !== 'trash') renderItems();
+      closeSidebar();
     });
   });
   $('btn-add-cat').addEventListener('click', () => openCatModal(null));
+  $('btn-menu').addEventListener('click', () => {
+    document.querySelector('.sidebar').classList.toggle('open');
+  });
 
   let searchTimer;
   $('search').addEventListener('input', (e) => {
@@ -396,6 +440,7 @@ function bind() {
   $('f-cancel').addEventListener('click', () => $('modal-item').classList.add('hidden'));
   $('f-save').addEventListener('click', saveItem);
   $('f-addcat').addEventListener('click', quickAddCategoryFromItem);
+  $('f-aisummary').addEventListener('click', genSummary);
 
   $('c-cancel').addEventListener('click', () => $('modal-cat').classList.add('hidden'));
   $('c-save').addEventListener('click', async () => {
