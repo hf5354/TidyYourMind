@@ -11,7 +11,7 @@
 - 每件收藏可屬**多個**分類；加入時可多選現有分類或即場新增分類名
 - ✨ 一鍵 AI 協助分類：為未分類／全部項目建議分類，列出修改記錄（由咩分類變咩分類＋原因），你確認後先套用
 - 🤖 AI 生成簡介：新增／編輯項目時一鍵由 AI 用繁體中文寫 2–3 句簡介（server 會先抓取目標網頁嘅標題／描述做參考）；冇金鑰時用規則式後備並註明
-- 📎 檔案上傳：PDF、圖片、文字、Office 文件（最多 25MB），經 backend 直接上傳去你 Drive 嘅 `TidyYourMind` 資料夾；卡片會顯示 📎 徽章，撳標題用 Drive 預覽開啟
+- 📎 檔案上傳：PDF、圖片、影片、聲音、文字、Office 文件（最多 25MB），經 backend 直接上傳去你 Drive 嘅 `TidyYourMind` 資料夾；卡片會顯示 📎 徽章，撳標題用 Drive 預覽開啟
 - 即時搜尋（標題＋簡介）
 - 冇 AI 金鑰時自動用內置規則式分類，並喺 UI 誠實標示
 
@@ -118,7 +118,7 @@ docker run -p 3000:3000 --env-file .env tidymind-web
 
 ## 檔案上傳
 
-- 新增內容時揀「📎 上傳檔案」分頁，支援 PDF、常見圖片（jpeg/png/gif/webp）、純文字／markdown、Word／Excel／PowerPoint（含新舊格式）。
+- 新增內容時揀「📎 上傳檔案」分頁，支援 PDF、常見圖片（jpeg/png/gif/webp）、影片（mp4/webm/mov/avi/mkv）、聲音（mp3/wav/ogg/m4a/aac/flac）、純文字／markdown、Word／Excel／PowerPoint（含新舊格式）。
 - 單檔上限 **25MB**（超咗會回 413 並誠實提示）。
 - 檔案經 backend 直接上傳去你 Google Drive 嘅 `TidyYourMind` 資料夾（沿用 `drive.file` scope，app 只掂到自己建立嘅檔案）；**唔會** base64 塞入 `data.json`。
 - 上傳成功先會建立收藏記錄；Drive 上傳失敗會回 502，唔會留低孤兒記錄。

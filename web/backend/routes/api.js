@@ -27,7 +27,7 @@ const ai = require('../lib/ai');
 
 const router = express.Router();
 
-const ITEM_TYPES = ['網站', '新聞', '影片', '文件', '圖片'];
+const ITEM_TYPES = ['網站', '新聞', '影片', '聲音', '文件', '圖片'];
 const MAX_NAME = 60;
 const MAX_TITLE = 200;
 const MAX_SUMMARY = 2000;
@@ -412,6 +412,8 @@ const ALLOWED_MIME = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+  'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/flac', 'audio/webm',
 ]);
 
 const upload = multer({
@@ -432,6 +434,8 @@ function cleanFileName(raw) {
 
 function inferTypeFromMime(mime) {
   if (typeof mime === 'string' && mime.startsWith('image/')) return '圖片';
+  if (typeof mime === 'string' && mime.startsWith('video/')) return '影片';
+  if (typeof mime === 'string' && mime.startsWith('audio/')) return '聲音';
   return '文件';
 }
 
@@ -448,7 +452,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const file = req.file;
     if (!file) return bad(res, 400, '請選擇要上傳嘅檔案');
     if (!ALLOWED_MIME.has(file.mimetype)) {
-      return bad(res, 400, '唔支援呢種檔案格式（支援 PDF、圖片、文字、Office 文件）');
+      return bad(res, 400, '唔支援呢種檔案格式（支援 PDF、圖片、影片、聲音、文字、Office 文件）');
     }
     const c = await ctx(req);
     if (c.error) return bad(res, 401, c.error);
