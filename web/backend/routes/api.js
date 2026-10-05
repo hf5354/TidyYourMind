@@ -12,7 +12,8 @@
  *   PUT    /api/items/:id         {title?, url?, type?, summary?, categories?}
  *   DELETE /api/items/:id                 移去垃圾桶（可還原）
  *   POST   /api/items/:id/restore         由垃圾桶還原
- *   DELETE /api/items/:id/permanent       永久刪除
+ *   DELETE /api/items/:id/permanent       永久刪除（上傳檔案會連 Drive 檔案一併刪除）
+ *   POST   /api/items/:id/replace         multipart: file（≤25MB），更換已上傳檔案（舊檔喺 Drive 刪除）
  *   POST   /api/ai/suggest        {scope: 'uncategorized'|'all'}
  *   POST   /api/ai/apply          {changes: [{itemId, categoryIds}]}
  *   POST   /api/ai/summarize      {title?, url?, type?}
@@ -263,9 +264,29 @@ router.put('/items/:id', async (req, res) => {
     if (!item) return bad(res, 404, '搵唔到呢個項目');
     const v = validateItemInput(req.body || {}, c.data.categories, true);
     if (v.error) return bad(res, 400, v.error);
+    const oldTitle = item.title;
     Object.assign(item, v.value, { updatedAt: new Date().toISOString() });
+    let note = '';
+    // 上傳檔案改標題 → 同步改 Drive 檔名（保留副檔名；標題即檔名）
+    if (
+      item.source === 'upload' && item.driveFileId &&
+      v.value.title !== undefined && v.value.title !== oldTitle
+    ) {
+      const ext = typeof item.fileName === 'string' && item.fileName.includes('.')
+        ? item.fileName.slice(item.fileName.lastIndexOf('.'))
+        : '';
+      const newName = v.value.title + ext;
+      try {
+        await store.renameFile(c.drive, item.driveFileId, newName);
+        item.fileName = newName;
+        note = 'Drive 檔名已同步更新';
+      } catch (err) {
+        console.error('[api] Drive 改名失敗：', err.message);
+        note = '注意：Drive 檔名未能同步更新（項目資料已儲存）';
+      }
+    }
     await store.writeData(c.drive, c.folder.id, c.data);
-    res.json({ ok: true, item });
+    res.json({ ok: true, item, note });
   } catch (err) {
     console.error('[api] 修改項目失敗：', err.message);
     bad(res, 502, '修改失敗');
@@ -310,9 +331,21 @@ router.delete('/items/:id/permanent', async (req, res) => {
     if (c.error) return bad(res, 401, c.error);
     const idx = c.data.items.findIndex((x) => x.id === req.params.id);
     if (idx === -1) return bad(res, 404, '搵唔到呢個項目');
+    const item = c.data.items[idx];
+    // 上傳檔案：連 Drive 上嘅檔案一齊刪除，唔留孤兒檔
+    let driveNote = '';
+    if (item.source === 'upload' && item.driveFileId) {
+      try {
+        await store.deleteFile(c.drive, item.driveFileId);
+        driveNote = '（Drive 上嘅檔案已一併刪除）';
+      } catch (err) {
+        console.error('[api] 刪除 Drive 檔案失敗：', err.message);
+        driveNote = '（注意：Drive 上嘅檔案未能刪除，請人手處理）';
+      }
+    }
     c.data.items.splice(idx, 1);
     await store.writeData(c.drive, c.folder.id, c.data);
-    res.json({ ok: true, message: '已永久刪除，無法還原' });
+    res.json({ ok: true, message: `已永久刪除${driveNote}，無法還原` });
   } catch (err) {
     console.error('[api] 永久刪除失敗：', err.message);
     bad(res, 502, '刪除失敗');
@@ -522,6 +555,66 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('[api] 檔案上傳失敗：', err.message);
     bad(res, 502, '上傳失敗，請稍後再試');
+  }
+});
+
+/**
+ * POST /items/:id/replace（multipart/form-data）
+ *   file: 新檔案（最多 25MB，同 /upload 一樣嘅格式限制）
+ * 更換已上傳檔案：先上傳新檔去 Drive，成功先刪舊檔；新檔名用項目標題＋新副檔名
+ * （標題即檔名，保持同步）。淨係俾 source:'upload' 嘅項目用。
+ */
+router.post('/items/:id/replace', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return bad(res, 400, '請選擇要換上嘅檔案');
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      return bad(res, 400, '唔支援呢種檔案格式（支援 PDF、圖片、影片、聲音、文字、Office 文件）');
+    }
+    const c = await ctx(req);
+    if (c.error) return bad(res, 401, c.error);
+    const item = c.data.items.find((x) => x.id === req.params.id && !x.trashed);
+    if (!item) return bad(res, 404, '搵唔到呢個項目');
+    if (item.source !== 'upload' || !item.driveFileId) {
+      return bad(res, 400, '呢個項目唔係上傳檔案，唔可以更換檔案');
+    }
+
+    const oldFileId = item.driveFileId;
+    const ext = file.originalname.includes('.')
+      ? file.originalname.slice(file.originalname.lastIndexOf('.'))
+      : '';
+    const newName = cleanFileName(item.title + ext);
+
+    // 先上傳新檔，成功先郁舊檔，唔會無端端唔見咗個檔
+    let uploaded;
+    try {
+      uploaded = await store.uploadFile(c.drive, c.folder.id, {
+        name: newName,
+        mimeType: file.mimetype,
+        buffer: file.buffer,
+      });
+    } catch (err) {
+      console.error('[api] 更換檔案上傳去 Drive 失敗：', err.message);
+      return bad(res, 502, '新檔案上傳去 Drive 失敗，請稍後再試（舊檔案未郁）');
+    }
+    try {
+      await store.deleteFile(c.drive, oldFileId);
+    } catch (err) {
+      console.error('[api] 刪除舊 Drive 檔案失敗：', err.message);
+    }
+
+    item.driveFileId = uploaded.id;
+    item.fileName = uploaded.name || newName;
+    item.mimeType = uploaded.mimeType || file.mimetype;
+    item.fileSize = uploaded.size != null ? Number(uploaded.size) : file.size;
+    item.url = uploaded.webViewLink || item.url;
+    item.type = inferTypeFromMime(file.mimetype);
+    item.updatedAt = new Date().toISOString();
+    await store.writeData(c.drive, c.folder.id, c.data);
+    res.json({ ok: true, item });
+  } catch (err) {
+    console.error('[api] 更換檔案失敗：', err.message);
+    bad(res, 502, '更換檔案失敗，請稍後再試');
   }
 });
 

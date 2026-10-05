@@ -139,6 +139,34 @@ async function uploadFile(drive, folderId, { name, mimeType, buffer }) {
   return created.data;
 }
 
+/**
+ * 改 Drive 檔案名。
+ * @returns {Promise<{id, name}>}
+ */
+async function renameFile(drive, fileId, name) {
+  const r = await drive.files.update({
+    fileId,
+    fields: 'id, name',
+    requestBody: { name },
+  });
+  return r.data;
+}
+
+/**
+ * 刪 Drive 檔案。檔案已經唔喺度（404）都當成功，唔阻住成個流程；
+ * 其他錯誤就 throw，等 caller 決定點處理。
+ */
+async function deleteFile(drive, fileId) {
+  try {
+    await drive.files.delete({ fileId });
+    return true;
+  } catch (err) {
+    const status = err && (err.code || (err.response && err.response.status));
+    if (status === 404) return false;
+    throw err;
+  }
+}
+
 module.exports = {
   APP_FOLDER_NAME,
   DATA_FILE_NAME,
@@ -150,4 +178,6 @@ module.exports = {
   readData,
   writeData,
   uploadFile,
+  renameFile,
+  deleteFile,
 };

@@ -277,10 +277,16 @@ function openItemModal(item) {
   } else {
     setItemMode('link');
     if (item.source === 'upload') {
-      uploadNote.innerHTML = `📎 已上傳檔案「${esc(item.fileName || '')}」— 如需換檔請刪除重傳；呢度可以改標題／簡介／分類。`;
+      uploadNote.innerHTML = `📎 已上傳「${esc(item.fileName || '')}」— 改標題會同步改 Drive 檔名；下面揀新檔案可以更換（舊檔會喺 Drive 刪除）。`;
       uploadNote.classList.remove('hidden');
+      $('f-upload-label').textContent = '🔄 更換檔案（唔揀就保留原檔）';
+      $('f-upload-block').classList.remove('hidden');
+      $('f-url-label').classList.add('hidden'); // 上傳項目嘅連結係 Drive 預覽，唔俾手改
     } else {
       uploadNote.classList.add('hidden');
+      $('f-upload-label').textContent = '上傳檔案';
+      $('f-upload-block').classList.add('hidden');
+      $('f-url-label').classList.remove('hidden');
     }
   }
   $('modal-item').classList.remove('hidden');
@@ -334,24 +340,53 @@ async function quickAddCategoryFromItem() {
 
 async function saveItem() {
   if (!state.editingItem && state.itemMode === 'upload') return saveUploadItem();
-  const body = {
-    title: $('f-title').value.trim(),
-    url: $('f-url').value.trim(),
-    type: $('f-type').value,
-    summary: $('f-summary').value.trim(),
-    categories: selectedCatIds(),
-  };
+  const btn = $('f-save');
+  btn.disabled = true;
+  btn.textContent = '儲存中…';
   try {
+    // 編輯已上傳項目＋揀咗新檔：先換檔，再存其他資料
+    if (state.editingItem && state.editingItem.source === 'upload') {
+      const file = $('f-file').files[0];
+      if (file) {
+        btn.textContent = '更換檔案中…';
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`/api/items/${state.editingItem.id}/replace`, { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) {
+          throw new Error(data.error || `更換檔案失敗（${res.status}）`);
+        }
+        // 換檔成功：用 server 回傳嘅最新資料（新檔名、新類型、新預覽連結）
+        state.editingItem = data.item;
+        $('f-type').value = data.item.type;
+        btn.textContent = '儲存中…';
+      }
+    }
+    const body = {
+      title: $('f-title').value.trim(),
+      type: $('f-type').value,
+      summary: $('f-summary').value.trim(),
+      categories: selectedCatIds(),
+    };
+    // 上傳項目嘅連結係 Drive 預覽連結，唔經呢度改（換檔時 server 已經更新）
+    if (!(state.editingItem && state.editingItem.source === 'upload')) {
+      body.url = $('f-url').value.trim();
+    }
     if (state.editingItem) {
-      await api(`/api/items/${state.editingItem.id}`, { method: 'PUT', body: JSON.stringify(body) });
-      toast('已更新');
+      const data = await api(`/api/items/${state.editingItem.id}`, { method: 'PUT', body: JSON.stringify(body) });
+      toast(data.note ? `已更新（${data.note}）` : '已更新');
     } else {
       await api('/api/items', { method: 'POST', body: JSON.stringify(body) });
       toast('已加入收藏');
     }
     $('modal-item').classList.add('hidden');
     await loadData();
-  } catch (err) { toast(err.message); }
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '儲存';
+  }
 }
 
 /** 上傳模式：用 FormData（唔好 set Content-Type，等瀏覽器自己加 boundary） */
