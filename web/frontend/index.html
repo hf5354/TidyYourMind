@@ -51,11 +51,22 @@
   <div id="modal-item" class="modal hidden">
     <div class="modal-card">
       <h2 id="item-modal-title">加入內容</h2>
+      <div id="mode-tabs" class="mode-tabs" role="tablist">
+        <button id="mode-link" class="mode-tab active" type="button">🔗 貼連結</button>
+        <button id="mode-upload" class="mode-tab" type="button">📎 上傳檔案</button>
+      </div>
+      <div id="f-upload-note" class="upload-note hidden"></div>
+      <div id="f-upload-block" class="field hidden">上傳檔案
+        <input id="f-file" type="file"
+          accept="application/pdf,image/jpeg,image/png,image/gif,image/webp,text/plain,text/markdown,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+        <div id="f-file-info" class="muted"></div>
+        <div class="muted">最多 25MB；檔案會上傳去你 Google Drive 嘅 TidyYourMind 資料夾。<br>注意：唔做病毒掃描，請只上傳你信任嘅檔案。</div>
+      </div>
       <label>標題<input id="f-title" maxlength="200" placeholder="例如：香港天文台天氣報告" /></label>
-      <label>連結<input id="f-url" inputmode="url" placeholder="https://…" /></label>
+      <label id="f-url-label">連結<input id="f-url" inputmode="url" placeholder="https://…" /></label>
       <label>類型
         <select id="f-type">
-          <option>網站</option><option>新聞</option><option>影片</option><option>文件</option>
+          <option>網站</option><option>新聞</option><option>影片</option><option>文件</option><option>圖片</option>
         </select>
       </label>
       <div class="field">簡介

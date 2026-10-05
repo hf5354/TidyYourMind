@@ -15,20 +15,24 @@
  *   DELETE /api/items/:id/permanent       永久刪除
  *   POST   /api/ai/suggest        {scope: 'uncategorized'|'all'}
  *   POST   /api/ai/apply          {changes: [{itemId, categoryIds}]}
+ *   POST   /api/ai/summarize      {title?, url?, type?}
+ *   POST   /api/upload            multipart: file（≤25MB）+ title? + summary? + categories?（JSON 字串）
  */
 
 const express = require('express');
+const multer = require('multer');
 const { randomUUID } = require('crypto');
 const store = require('../lib/drive');
 const ai = require('../lib/ai');
 
 const router = express.Router();
 
-const ITEM_TYPES = ['網站', '新聞', '影片', '文件'];
+const ITEM_TYPES = ['網站', '新聞', '影片', '文件', '圖片'];
 const MAX_NAME = 60;
 const MAX_TITLE = 200;
 const MAX_SUMMARY = 2000;
 const MAX_URL = 2048;
+const UPLOAD_MAX_SIZE = 25 * 1024 * 1024; // 25MB
 
 /* ---------- 小工具 ---------- */
 
@@ -394,6 +398,136 @@ router.post('/ai/summarize', async (req, res) => {
     console.error('[api] AI 簡介失敗：', err.message);
     bad(res, 502, '生成簡介失敗，請稍後再試或人手填寫');
   }
+});
+
+/* ---------- 檔案上傳 ---------- */
+
+const ALLOWED_MIME = new Set([
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'text/plain', 'text/markdown',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: UPLOAD_MAX_SIZE, files: 1 },
+});
+
+/** 去路徑、去控制字元、限長度，唔好畀奇怪檔名搞到 Drive。 */
+function cleanFileName(raw) {
+  let name = String(raw == null ? '' : raw)
+    .split('/').pop().split('\\').pop()
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .trim();
+  if (!name) name = '未命名檔案';
+  if (name.length > 200) name = name.slice(0, 200);
+  return name;
+}
+
+function inferTypeFromMime(mime) {
+  if (typeof mime === 'string' && mime.startsWith('image/')) return '圖片';
+  return '文件';
+}
+
+/**
+ * POST /api/upload（multipart/form-data）
+ *   file: 檔案本身（最多 25MB）
+ *   title?: 標題（預設用檔名去副檔名）
+ *   summary?: 簡介
+ *   categories?: 分類 id 嘅 JSON array 字串
+ * 檔案上傳去 Drive 成功後先建 item；上傳失敗唔會留孤兒記錄。
+ */
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return bad(res, 400, '請選擇要上傳嘅檔案');
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      return bad(res, 400, '唔支援呢種檔案格式（支援 PDF、圖片、文字、Office 文件）');
+    }
+    const c = await ctx(req);
+    if (c.error) return bad(res, 401, c.error);
+
+    const body = req.body || {};
+    const fileName = cleanFileName(file.originalname);
+    let title = typeof body.title === 'string' ? body.title.trim() : '';
+    if (!title) {
+      title = fileName.replace(/\.[^.]{1,10}$/, '').trim() || '未命名檔案';
+    }
+    if (title.length > MAX_TITLE) return bad(res, 400, '標題太長（最多 200 字）');
+
+    const summary = typeof body.summary === 'string'
+      ? body.summary.trim().slice(0, MAX_SUMMARY)
+      : '';
+    let categories = [];
+    if (body.categories !== undefined && body.categories !== '') {
+      let parsed;
+      try {
+        parsed = JSON.parse(body.categories);
+      } catch {
+        return bad(res, 400, '分類格式唔正確');
+      }
+      const ids = cleanCatIds(parsed, c.data.categories);
+      if (!ids) return bad(res, 400, '分類格式唔正確');
+      categories = ids;
+    }
+
+    let uploaded;
+    try {
+      uploaded = await store.uploadFile(c.drive, c.folder.id, {
+        name: fileName,
+        mimeType: file.mimetype,
+        buffer: file.buffer,
+      });
+    } catch (err) {
+      console.error('[api] 上傳去 Drive 失敗：', err.message);
+      return bad(res, 502, '檔案上傳去 Drive 失敗，請稍後再試（未建立收藏記錄）');
+    }
+
+    const url = uploaded && uploaded.webViewLink ? cleanUrl(uploaded.webViewLink) : null;
+    if (!url) {
+      console.error('[api] Drive 未回傳有效 webViewLink');
+      return bad(res, 502, 'Drive 未回傳有效預覽連結');
+    }
+
+    const now = new Date().toISOString();
+    const item = {
+      id: randomUUID(),
+      title,
+      url,
+      type: inferTypeFromMime(file.mimetype),
+      summary,
+      categories,
+      source: 'upload',
+      driveFileId: uploaded.id,
+      fileName,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      trashed: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    c.data.items.unshift(item);
+    await store.writeData(c.drive, c.folder.id, c.data);
+    res.json({ ok: true, item });
+  } catch (err) {
+    console.error('[api] 檔案上傳失敗：', err.message);
+    bad(res, 502, '上傳失敗，請稍後再試');
+  }
+});
+
+// multer 錯誤（例如超 25MB）轉做 JSON 回應，唔好跌去 Express 預設 HTML 500
+router.use((err, req, res, next) => {
+  if (err && err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') return bad(res, 413, '檔案太大，上限係 25MB');
+    return bad(res, 400, '上傳出錯：' + (err.message || err.code || '未知錯誤'));
+  }
+  next(err);
 });
 
 module.exports = router;

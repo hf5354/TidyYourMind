@@ -117,6 +117,25 @@ body {
 .topbar-left { display: flex; align-items: center; gap: 8px; }
 .menu-btn { display: none; }
 .field .fit { align-self: flex-start; }
+
+/* ---------- 檔案上傳 ---------- */
+.mode-tabs { display: flex; gap: 8px; }
+.mode-tab {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 0.95em;
+}
+.mode-tab.active {
+  background: var(--primary); border-color: var(--primary);
+  color: var(--primary-text); font-weight: 600;
+}
+.upload-note {
+  font-size: 0.88em; color: var(--muted);
+  border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.file-badge { font-size: 0.85em; color: var(--muted); overflow-wrap: anywhere; }
+.modal-card input[type="file"] {
+  padding: 10px 0; background: none; border: none; width: 100%; font-size: 1em;
+}
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 0.78em; padding: 3px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
 .chip.none { color: var(--muted); font-style: italic; }
@@ -204,6 +223,9 @@ body {
   .check-list label { min-height: 44px; }
   .new-cat-row { flex-direction: column; }
   .new-cat-row .btn { min-height: 44px; }
+
+  .mode-tabs { flex-direction: column; }
+  .mode-tab { min-height: 44px; }
 
   .toast {
     max-width: calc(100vw - 32px); text-align: center;

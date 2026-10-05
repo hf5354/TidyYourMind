@@ -101,8 +101,7 @@ async function readData(drive, folderId) {
   return data;
 }
 
-/** 寫 data.json（create 或 update），並失效快取。 */
-async function writeData(drive, folderId, data) {
+/** 寫 data.json（create 或 update），並失效快取。 */async function writeData(drive, folderId, data) {
   const payload = JSON.stringify(
     { categories: data.categories || [], items: data.items || [] },
     null,
@@ -126,6 +125,20 @@ async function writeData(drive, folderId, data) {
   invalidateCache(folderId);
 }
 
+/**
+ * 上傳一個檔案去 TidyYourMind 資料夾（唔係 data.json，係獨立檔案）。
+ * @returns {Promise<{id, name, mimeType, size, webViewLink}>}
+ */
+async function uploadFile(drive, folderId, { name, mimeType, buffer }) {
+  const { Readable } = require('stream');
+  const created = await drive.files.create({
+    fields: 'id, name, mimeType, size, webViewLink',
+    requestBody: { name, mimeType, parents: [folderId] },
+    media: { mimeType, body: Readable.from(buffer) },
+  });
+  return created.data;
+}
+
 module.exports = {
   APP_FOLDER_NAME,
   DATA_FILE_NAME,
@@ -136,4 +149,5 @@ module.exports = {
   ensureAppFolder,
   readData,
   writeData,
+  uploadFile,
 };

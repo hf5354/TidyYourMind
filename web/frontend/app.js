@@ -15,6 +15,7 @@ const state = {
   editingItem: null,
   editingCat: null,
   aiSuggestions: [],
+  itemMode: 'link', // link | upload（加入內容 modal 用；編輯時唔俾轉 mode）
 };
 
 function esc(s) {
@@ -164,6 +165,7 @@ function renderItems() {
   box.innerHTML = list.map((it) => `
     <div class="card" data-id="${esc(it.id)}">
       <span class="type-badge">${esc(it.type || '網站')}</span>
+      ${it.source === 'upload' ? `<div class="file-badge" title="檔案已上傳去你嘅 Google Drive，撳標題用 Drive 預覽開啟">📎 ${esc(it.fileName || '已上傳檔案')}${it.fileSize ? `（${fmtSize(it.fileSize)}）` : ''}</div>` : ''}
       <h3><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a></h3>
       ${it.summary ? `<div class="summary">${esc(it.summary)}</div>` : ''}
       <div class="chips">${(it.categories || []).length
@@ -260,10 +262,57 @@ function openItemModal(item) {
   $('f-type').value = item ? item.type : '網站';
   $('f-summary').value = item ? (item.summary || '') : '';
   $('f-newcat').value = '';
+  $('f-file').value = '';
+  $('f-file-info').textContent = '';
   resetAiSummaryBtn();
   renderItemCatChecks(item ? (item.categories || []) : []);
+
+  // 加入模式先有得揀「貼連結／上傳檔案」；編輯時唔俾轉 mode
+  const isNew = !item;
+  $('mode-tabs').classList.toggle('hidden', !isNew);
+  const uploadNote = $('f-upload-note');
+  if (isNew) {
+    uploadNote.classList.add('hidden');
+    setItemMode('link');
+  } else {
+    setItemMode('link');
+    if (item.source === 'upload') {
+      uploadNote.innerHTML = `📎 已上傳檔案「${esc(item.fileName || '')}」— 如需換檔請刪除重傳；呢度可以改標題／簡介／分類。`;
+      uploadNote.classList.remove('hidden');
+    } else {
+      uploadNote.classList.add('hidden');
+    }
+  }
   $('modal-item').classList.remove('hidden');
   $('f-title').focus();
+}
+
+function setItemMode(mode) {
+  state.itemMode = mode;
+  $('mode-link').classList.toggle('active', mode === 'link');
+  $('mode-upload').classList.toggle('active', mode === 'upload');
+  $('f-url-label').classList.toggle('hidden', mode === 'upload');
+  $('f-upload-block').classList.toggle('hidden', mode === 'link');
+  // 上傳模式標題預設用檔名，唔再需要揀類型（server 會按 mime 推斷）
+  $('f-type').closest('label').classList.toggle('hidden', mode === 'upload');
+}
+
+function fmtSize(bytes) {
+  if (bytes == null || isNaN(bytes)) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function onFilePicked() {
+  const file = $('f-file').files[0];
+  const info = $('f-file-info');
+  if (!file) { info.textContent = ''; return; }
+  info.textContent = `已選：${file.name}（${fmtSize(file.size)}）`;
+  // 標題未填就用檔名（去副檔名）預填，用戶照樣可以改
+  if (!$('f-title').value.trim()) {
+    $('f-title').value = file.name.replace(/\.[^.]{1,10}$/, '');
+  }
 }
 
 function selectedCatIds() {
@@ -284,6 +333,7 @@ async function quickAddCategoryFromItem() {
 }
 
 async function saveItem() {
+  if (!state.editingItem && state.itemMode === 'upload') return saveUploadItem();
   const body = {
     title: $('f-title').value.trim(),
     url: $('f-url').value.trim(),
@@ -302,6 +352,35 @@ async function saveItem() {
     $('modal-item').classList.add('hidden');
     await loadData();
   } catch (err) { toast(err.message); }
+}
+
+/** 上傳模式：用 FormData（唔好 set Content-Type，等瀏覽器自己加 boundary） */
+async function saveUploadItem() {
+  const file = $('f-file').files[0];
+  if (!file) { toast('請先選擇要上傳嘅檔案'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', $('f-title').value.trim());
+  fd.append('summary', $('f-summary').value.trim());
+  fd.append('categories', JSON.stringify(selectedCatIds()));
+  const btn = $('f-save');
+  btn.disabled = true;
+  btn.textContent = '上傳中…';
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || `上傳失敗（${res.status}）`);
+    }
+    toast('檔案已上傳並加入收藏');
+    $('modal-item').classList.add('hidden');
+    await loadData();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '儲存';
+  }
 }
 
 /* ---------- AI 生成簡介 ---------- */
@@ -441,6 +520,9 @@ function bind() {
   $('f-save').addEventListener('click', saveItem);
   $('f-addcat').addEventListener('click', quickAddCategoryFromItem);
   $('f-aisummary').addEventListener('click', genSummary);
+  $('mode-link').addEventListener('click', () => setItemMode('link'));
+  $('mode-upload').addEventListener('click', () => setItemMode('upload'));
+  $('f-file').addEventListener('change', onFilePicked);
 
   $('c-cancel').addEventListener('click', () => $('modal-cat').classList.add('hidden'));
   $('c-save').addEventListener('click', async () => {
